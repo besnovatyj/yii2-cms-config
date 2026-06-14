@@ -14,7 +14,8 @@
   "extra": {
     "moduleClass": "Besnovatyj\\Config\\Module",
     "moduleId": "Config",
-    "bootstrap": "Besnovatyj\\Config\\Bootstrap"
+    "bootstrap": "Besnovatyj\\Config\\Bootstrap",
+    "bescms": { "kind": "module" }
   },
   "keywords": [
     "yii2",
