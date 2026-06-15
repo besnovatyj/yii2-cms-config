@@ -15,12 +15,21 @@ use Yii;
 /**
  * ConfigCollector - собирает опции конфигурации из всех установленных модулей.
  *
- * Использует статический метод Module::getOptions() для получения опций,
- * что позволяет работать с модулями из любых директорий (app/modules и composer vendor).
- * Fallback: сканирует файлы config/options.php для модулей без метода getOptions().
+ * Получает опции через статический метод модуля, поддерживая два контракта:
+ *  - legacy `Module::getOptions()` (прежний патч-modman);
+ *  - новый `ProvidesOptions::options()` (compile-not-patch modman).
+ * Это позволяет работать с модулями из любых директорий (app/modules и composer vendor).
  */
 class ConfigCollector
 {
+    /**
+     * Контракт нового modman, объявляющий настраиваемые опции модуля.
+     * Ссылаемся строкой, чтобы не зависеть жёстко от установленного менеджера модулей:
+     * если контракт недоступен, is_subclass_of() просто вернёт false.
+     */
+    private const OPTIONS_CONTRACT = 'modules\\modman\\contract\\ProvidesOptions';
+
+
     /**
      * Собирает все элементы конфигурации из модулей приложения
      *
@@ -56,22 +65,46 @@ class ConfigCollector
             return [];
         }
 
-        if (method_exists($className, 'getOptions')) {
-            try {
-                $options = $className::getOptions();
-
-                if (!is_array($options)) {
-                    Yii::warning("getOptions() for module '{$moduleId}' did not return an array", __METHOD__);
-                    return [];
-                }
-
-                return $this->createItemsFromArray($options);
-            } catch (\Exception $e) {
-                Yii::error("Failed to get options from module '{$moduleId}': {$e->getMessage()}", __METHOD__);
-                return [];
-            }
+        $options = $this->resolveModuleOptions($moduleId, $className);
+        if ($options === null) {
+            return [];
         }
-        return [];
+
+        return $this->createItemsFromArray($options);
+    }
+
+    /**
+     * Получает массив опций модуля из доступного контракта (legacy getOptions() или нового options()).
+     *
+     * @param string $moduleId  ID модуля (для диагностики)
+     * @param string $className Имя класса модуля
+     * @return array<int|string, mixed>|null null — модуль опций не предоставляет или вернул не-массив
+     */
+    private function resolveModuleOptions(string $moduleId, string $className): ?array
+    {
+        $method = match (true) {
+            method_exists($className, 'getOptions') => 'getOptions',
+            is_subclass_of($className, self::OPTIONS_CONTRACT) => 'options',
+            default => null,
+        };
+
+        if ($method === null) {
+            return null;
+        }
+
+        try {
+            $options = $className::$method();
+        } catch (\Throwable $e) {
+            Yii::error("Failed to get options from module '{$moduleId}': {$e->getMessage()}", __METHOD__);
+            return null;
+        }
+
+        if (!is_array($options)) {
+            Yii::warning("{$method}() for module '{$moduleId}' did not return an array", __METHOD__);
+            return null;
+        }
+
+        return $options;
     }
 
     /**
