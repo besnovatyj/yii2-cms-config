@@ -9,7 +9,7 @@ declare(strict_types=1);
 
 namespace Besnovatyj\Config\controllers\backend;
 
-use common\components\controller\ControllerTrait;
+use Besnovatyj\Kernel\controller\ControllerTrait;
 use Besnovatyj\Config\services\ConfigService;
 use Yii;
 use yii\helpers\VarDumper;
