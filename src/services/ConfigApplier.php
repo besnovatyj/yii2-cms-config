@@ -41,7 +41,7 @@ class ConfigApplier
      *
      * Примеры путей:
      * - 'modules.blog.params.comments_allowed' -> Yii::$app->getModule('blog')->params['comments_allowed']
-     * - 'modules.user.params.passwordResetTokenExpire' -> Yii::$app->getModule('user')->params['passwordResetTokenExpire']
+     * - 'modules.user.params.passwordResetTokenExpire' -> Yii::$app->getModule('User')->params['passwordResetTokenExpire']
      * - 'modules.Config.params.frontend.app.name' -> Yii::$app->getModule('Config')->params['frontend']['app']['name']
      *
      * @param string $path Путь в конфигурации
