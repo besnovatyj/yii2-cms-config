@@ -27,7 +27,7 @@ class ConfigCollector
      * Ссылаемся строкой, чтобы не зависеть жёстко от установленного менеджера модулей:
      * если контракт недоступен, is_subclass_of() просто вернёт false.
      */
-    private const OPTIONS_CONTRACT = 'modules\\modman\\contract\\ProvidesOptions';
+    private const OPTIONS_CONTRACT = \Besnovatyj\Contracts\module\ProvidesOptions::class;
 
 
     /**
