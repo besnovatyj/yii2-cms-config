@@ -14,7 +14,10 @@
     "moduleClass": "Besnovatyj\\Config\\Module",
     "moduleId": "Config",
     "bootstrap": "Besnovatyj\\Config\\Bootstrap",
-    "bescms": { "kind": "module" }
+    "bescms": { "kind": "module" },
+    "config-plugin": {
+      "common": "src/config/common.php"
+    }
   },
   "keywords": [
     "yii2",
