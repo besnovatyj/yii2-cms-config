@@ -4,7 +4,7 @@
  * Copyright (c) 2026 Besnovatyj. Licensed under the MIT License.
  */
 
-return [
+return [[
     'label' => 'Config',
     'iconClass' => 'bi bi-gear me-1',
     'url' => ['/Config/backend/config/index'],
@@ -22,4 +22,4 @@ return [
             ],
         ],
     ],
-];
+]];
