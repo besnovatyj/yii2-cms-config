@@ -16,6 +16,7 @@
     "bootstrap": "Besnovatyj\\Config\\Bootstrap",
     "bescms": { "kind": "module" },
     "config-plugin": {
+      "admin-menu": "src/config/adminMenu.php",
       "common": "src/config/common.php"
     }
   },
