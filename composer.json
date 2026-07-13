@@ -13,7 +13,6 @@
   "extra": {
     "moduleClass": "Besnovatyj\\Config\\Module",
     "moduleId": "Config",
-    "bootstrap": "Besnovatyj\\Config\\Bootstrap",
     "bescms": { "kind": "module" },
     "config-plugin": {
       "admin-menu": "src/config/adminMenu.php",

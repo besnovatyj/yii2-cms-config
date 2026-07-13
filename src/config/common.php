@@ -12,7 +12,8 @@ use Besnovatyj\Config\Module;
  * Yii2-конфиг модуля для движка yiisoft/config (группа `common` — общий для всех приложений).
  *
  * Объявляется через `extra.config-plugin`, собирается modman в merge-plan и мёржится в рантайме.
- * Содержит регистрацию модуля. Меню (adminMenu) и миграции остаются вкладами modman. Значения берутся
+ * Содержит регистрацию модуля + bootstrap-классы (L2 — выполняются только у активного модуля, гейт
+ * modman). Меню (adminMenu) и миграции остаются вкладами modman. Значения берутся
  * из статических методов {@see Module} — единый источник, без дублирования.
  */
 return [
@@ -23,4 +24,5 @@ return [
             ['version' => Module::moduleVersion()],
         ),
     ],
+    'bootstrap' => array_values(Module::bootstrapClasses()),
 ];

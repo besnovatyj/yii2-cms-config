@@ -11,6 +11,7 @@ namespace Besnovatyj\Config;
 use Besnovatyj\Kernel\module\CmsModule;
 use Besnovatyj\Contracts\module\DeclaresModule;
 use Besnovatyj\Contracts\module\ProvidesAdminMenu;
+use Besnovatyj\Contracts\module\ProvidesBootstrap;
 use Besnovatyj\Contracts\module\ProvidesOptions;
 
 /**
@@ -25,7 +26,7 @@ use Besnovatyj\Contracts\module\ProvidesOptions;
  */
 class Module extends CmsModule implements
     DeclaresModule, ProvidesAdminMenu,
-    ProvidesOptions
+    ProvidesBootstrap, ProvidesOptions
 {
     public const bool EDITABLE = true;
     public const string VERSION = '1.0.0';
@@ -37,5 +38,6 @@ class Module extends CmsModule implements
     public static function adminMenu(): array { return require __DIR__.'/config/adminMenu.php'; }
     public static function moduleConfig(): array { return require __DIR__.'/config/config.php'; }
     public static function options(): array { return require __DIR__.'/config/options.php'; }
+    public static function bootstrapClasses(): array { return [Bootstrap::class]; }
 
 }
