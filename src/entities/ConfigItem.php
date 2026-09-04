@@ -25,6 +25,8 @@ use yii\helpers\ArrayHelper;
  * @property-read array $rules Правила валидации Yii2
  * @property-read array $inputOptions Опции для рендеринга поля ввода
  * @property-read mixed $defaultValue Значение по умолчанию
+ * @property-read string $module ID модуля-владельца опции (заполняет ConfigCollector)
+ * @property-read string $group Подгруппа внутри раздела (необязательный подзаголовок в UI)
  */
 class ConfigItem
 {
@@ -33,10 +35,12 @@ class ConfigItem
         public readonly string $path,
         public readonly string $label,
         public readonly string $description = '',
-        public readonly string $category = 'app',
+        public readonly string $category = '',
         public readonly array $rules = [],
         public readonly array $inputOptions = [],
-        public readonly mixed $defaultValue = null
+        public readonly mixed $defaultValue = null,
+        public readonly string $module = '',
+        public readonly string $group = ''
     ) {
     }
 
@@ -45,20 +49,42 @@ class ConfigItem
      *
      * @param string $id Идентификатор
      * @param array $config Конфигурация из options.php
+     * @param string $module ID модуля, объявившего опцию
      * @return self
      */
-    public static function fromArray(string $id, array $config): self
+    public static function fromArray(string $id, array $config, string $module = ''): self
     {
         return new self(
             id: $id,
             path: $config['path'] ?? '',
             label: $config['label'] ?? $id,
             description: $config['description'] ?? '',
-            category: $config['category'] ?? 'app',
+            category: (string)($config['category'] ?? ''),
             rules: $config['rules'] ?? [],
             inputOptions: $config['inputOptions'] ?? ['type' => 'input'],
-            defaultValue: $config['default'] ?? self::extractDefaultFromPath($config['path'] ?? '')
+            defaultValue: $config['default'] ?? self::extractDefaultFromPath($config['path'] ?? ''),
+            module: $module,
+            group: (string)($config['group'] ?? '')
         );
+    }
+
+    /**
+     * Ключ раздела, в котором опция показывается в UI и по которому работает
+     * deep-link `?category=...`.
+     *
+     * Приоритет: явная `category` из options.php → ID модуля-владельца → 'app'.
+     * Благодаря fallback'у на модуль опции без `category` больше не сваливаются
+     * в общую кучу настроек приложения.
+     *
+     * @return string
+     */
+    public function groupKey(): string
+    {
+        if ($this->category !== '') {
+            return $this->category;
+        }
+
+        return $this->module !== '' ? $this->module : 'app';
     }
 
     /**
@@ -179,6 +205,8 @@ class ConfigItem
             'label' => $this->label,
             'description' => $this->description,
             'category' => $this->category,
+            'module' => $this->module,
+            'group' => $this->group,
             'rules' => $this->rules,
             'inputOptions' => $this->inputOptions,
             'value' => $value ?? $this->defaultValue,

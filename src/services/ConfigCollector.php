@@ -70,7 +70,7 @@ class ConfigCollector
             return [];
         }
 
-        return $this->createItemsFromArray($options);
+        return $this->createItemsFromArray($options, $moduleId);
     }
 
     /**
@@ -150,9 +150,10 @@ class ConfigCollector
      * Создает ConfigItem объекты из массива опций
      *
      * @param array $options Массив опций из options.php
+     * @param string $moduleId ID модуля-владельца (используется для группировки в UI)
      * @return ConfigItem[]
      */
-    private function createItemsFromArray(array $options): array
+    private function createItemsFromArray(array $options, string $moduleId = ''): array
     {
         $items = [];
 
@@ -163,7 +164,7 @@ class ConfigCollector
             }
 
             try {
-                $items[$id] = ConfigItem::fromArray($id, $config);
+                $items[$id] = ConfigItem::fromArray($id, $config, $moduleId);
             } catch (\Exception $e) {
                 Yii::error("Failed to create ConfigItem for '{$id}': {$e->getMessage()}", __METHOD__);
             }

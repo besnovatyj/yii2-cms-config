@@ -41,9 +41,14 @@ class ConfigController extends Controller
     }
 
     /**
-     * Отображает и обрабатывает форму редактирования конфигурации
+     * Отображает и обрабатывает форму редактирования конфигурации.
      *
-     * @param string $category Фильтр по категории (app, blog, user и т.д.)
+     * Все параметры всегда отдаются в представление целиком: разделы переключаются
+     * на клиенте, поэтому одна отправка формы сохраняет любые изменения.
+     * Параметр $category задаёт лишь раздел, открытый при загрузке страницы
+     * (сохраняет работоспособность внешних ссылок вида ?category=Modman).
+     *
+     * @param string $category Открываемый раздел: его ключ (app, Blog, User) либо ID модуля
      * @return Response|string
      */
     public function actionIndex(string $category = ''): Response|string
@@ -52,37 +57,35 @@ class ConfigController extends Controller
             // Получаем все элементы конфигурации с текущими значениями
             $items = $this->configService->getAllWithValues();
 
-            // Фильтруем по категории если указана
-            if (!empty($category)) {
-                $items = array_filter($items, function ($data) use ($category) {
-                    return $data['item']->category === $category;
-                });
-            }
-
             // Обработка POST запроса (сохранение)
             if (Yii::$app->request->isPost) {
                 $values = Yii::$app->request->post('ConfigItem', []);
                 $result = $this->configService->saveValues($values);
 
                 if ($result['success']) {
-                    Yii::$app->session->setFlash('success', 'Configuration saved successfully.');
+                    Yii::$app->session->setFlash('success', 'Настройки сохранены.');
                     return $this->redirect(['index', 'category' => $category]);
-                } else {
-                    Yii::$app->session->setFlash('error', 'Validation errors occurred.');
-                    // Передаем ошибки в view
-                    return $this->render('index', [
-                        'items' => $items,
-                        'errors' => $result['errors'],
-                        'category' => $category,
-                    ]);
                 }
+
+                Yii::$app->session->setFlash('error', 'Значения не сохранены: есть ошибки валидации.');
+
+                // Возвращаем в форму то, что ввёл пользователь, а не сохранённые значения
+                $groups = $this->configService->groupWithValues($this->mergeSubmitted($items, $values));
+
+                return $this->render('index', [
+                    'groups' => $groups,
+                    'errors' => $result['errors'],
+                    'activeGroup' => $this->configService->resolveGroupKey($groups, $category),
+                ]);
             }
 
             // Отображаем форму
+            $groups = $this->configService->groupWithValues($items);
+
             return $this->render('index', [
-                'items' => $items,
+                'groups' => $groups,
                 'errors' => [],
-                'category' => $category,
+                'activeGroup' => $this->configService->resolveGroupKey($groups, $category),
             ]);
         } catch (Exception $e) {
             Yii::$app->errorHandler->logException($e);
@@ -92,24 +95,49 @@ class ConfigController extends Controller
                 Yii::$app->session->setFlash('error', 'Ошибка');
             }
             return $this->render('index', [
-                'items' => [],
+                'groups' => [],
                 'errors' => [],
-                'category' => '',
+                'activeGroup' => '',
             ]);
         }
     }
 
     /**
+     * Подставляет отправленные значения поверх текущих (для перерисовки формы с ошибками).
+     *
+     * @param array $items Результат ConfigService::getAllWithValues()
+     * @param array $values Отправленные значения [id => value]
+     * @return array
+     */
+    private function mergeSubmitted(array $items, array $values): array
+    {
+        foreach ($values as $id => $value) {
+            if (isset($items[$id])) {
+                $items[$id]['value'] = $value;
+            }
+        }
+
+        return $items;
+    }
+
+    /**
      * Восстанавливает значения по умолчанию.
-     * Очищает все сохраненные значения.
+     * Очищает сохраненные значения — все либо только одного раздела.
      *
      * @return Response
      */
     public function actionRestoreDefaults(): Response
     {
+        $category = (string)Yii::$app->request->post('category', '');
+
         try {
-            $this->configService->restoreDefaults();
-            Yii::$app->session->setFlash('success', 'Default values restored successfully.');
+            $this->configService->restoreDefaults($category);
+            Yii::$app->session->setFlash(
+                'success',
+                $category === ''
+                    ? 'Значения по умолчанию восстановлены.'
+                    : "Значения по умолчанию восстановлены для раздела «{$category}»."
+            );
         } catch (Exception $e) {
             Yii::$app->errorHandler->logException($e);
             if (YII_DEBUG) {
@@ -119,6 +147,6 @@ class ConfigController extends Controller
             }
         }
 
-        return $this->redirect(['index']);
+        return $this->redirect(['index', 'category' => $category]);
     }
 }
