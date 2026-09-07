@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace Besnovatyj\Config\entities;
 
+use Besnovatyj\Contracts\config\OptionItemsProvider;
 use Yii;
 use yii\base\Model;
 use yii\helpers\ArrayHelper;
@@ -30,6 +31,9 @@ use yii\helpers\ArrayHelper;
  */
 class ConfigItem
 {
+    /** @var array<string, string>|null Варианты выбора, полученные от поставщика (кэш на время запроса) */
+    private ?array $resolvedItems = null;
+
     public function __construct(
         public readonly string $id,
         public readonly string $path,
@@ -141,6 +145,55 @@ class ConfigItem
     }
 
     /**
+     * Варианты выбора для поля: либо перечисленные в options.php, либо собранные поставщиком.
+     *
+     * Поставщик ({@see OptionItemsProvider}) указывается вместо готового списка там, где варианты —
+     * это состав системы (установленные ядра поиска, движки редактора), а не фиксированный набор
+     * режимов. Он резолвится контейнером в момент обращения, то есть когда приложение уже поднято
+     * и знает, что установлено на самом деле.
+     *
+     * Сбой поставщика не должен ронять всю страницу настроек: пишем в лог и отдаём пустой список —
+     * администратор увидит пустое поле, а не белый экран.
+     *
+     * @return array<string, string> значение => подпись
+     */
+    public function inputItems(): array
+    {
+        if ($this->resolvedItems !== null) {
+            return $this->resolvedItems;
+        }
+
+        $provider = $this->inputOptions['itemsProvider'] ?? null;
+
+        if (!is_string($provider) || $provider === '') {
+            return $this->resolvedItems = (array)ArrayHelper::getValue($this->inputOptions, 'items', []);
+        }
+
+        try {
+            $instance = Yii::$container->get($provider);
+
+            if (!$instance instanceof OptionItemsProvider) {
+                Yii::error(
+                    "Поставщик вариантов '{$provider}' для опции '{$this->id}' не реализует "
+                    . OptionItemsProvider::class,
+                    __METHOD__,
+                );
+
+                return $this->resolvedItems = [];
+            }
+
+            return $this->resolvedItems = $instance->items();
+        } catch (\Throwable $e) {
+            Yii::error(
+                "Не удалось получить варианты опции '{$this->id}' у '{$provider}': {$e->getMessage()}",
+                __METHOD__,
+            );
+
+            return $this->resolvedItems = [];
+        }
+    }
+
+    /**
      * Валидирует значение согласно правилам
      *
      * @param mixed $value Значение для валидации
@@ -148,7 +201,9 @@ class ConfigItem
      */
     public function validate(mixed $value): array
     {
-        if (empty($this->rules)) {
+        $rules = $this->effectiveRules();
+
+        if (empty($rules)) {
             return [];
         }
 
@@ -166,7 +221,7 @@ class ConfigItem
 
         // Применяем правила валидации
         $validators = [];
-        foreach ($this->rules as $rule) {
+        foreach ($rules as $rule) {
             if (is_array($rule) && isset($rule[0])) {
                 $validatorType = $rule[0];
                 $params = array_slice($rule, 1);
@@ -189,6 +244,31 @@ class ConfigItem
         }
 
         return $errors;
+    }
+
+    /**
+     * Правила валидации с учётом поставщика вариантов.
+     *
+     * Когда варианты приходят от {@see OptionItemsProvider}, правило «значение из списка»
+     * добавляется само: писать `['in', 'range' => ...]` руками было бы вторым списком, который
+     * рано или поздно разойдётся с первым. Для опций с обычным `items` поведение не меняется —
+     * там список задан вручную, и правило тоже остаётся на совести автора опции.
+     *
+     * @return array Правила в формате options.php
+     */
+    private function effectiveRules(): array
+    {
+        if (!isset($this->inputOptions['itemsProvider'])) {
+            return $this->rules;
+        }
+
+        $items = $this->inputItems();
+
+        if ($items === []) {
+            return $this->rules;
+        }
+
+        return array_merge($this->rules, [['in', 'range' => array_keys($items)]]);
     }
 
     /**

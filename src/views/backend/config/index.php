@@ -222,10 +222,12 @@ $groupItems = static function (array $items): array {
                                             break;
 
                                         case 'dropdown':
+                                            // Варианты берём у самого элемента: он знает, перечислены ли они
+                                            // в options.php или их собирает поставщик (OptionItemsProvider).
                                             echo Html::dropDownList(
                                                 $inputName,
                                                 $scalar($value),
-                                                ArrayHelper::getValue($item->inputOptions, 'items', []),
+                                                $item->inputItems(),
                                                 ['id' => $inputId, 'class' => 'form-select' . ($hasError ? ' is-invalid' : '')]
                                             );
                                             break;
