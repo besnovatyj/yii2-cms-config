@@ -16,6 +16,7 @@ use Besnovatyj\Config\services\ConfigService;
 use Besnovatyj\Config\storage\PhpFileStorage;
 use Besnovatyj\Config\storage\StorageInterface;
 use Yii;
+use yii\base\Application;
 use yii\base\BootstrapInterface;
 use yii\di\Instance;
 
@@ -27,10 +28,19 @@ use yii\di\Instance;
  *
  * ПРОСТАЯ И ПОНЯТНАЯ ЛОГИКА:
  * 1. Регистрирует DI зависимости (т.к. модуль еще не инициализирован)
- * 2. Получает ConfigService из DI контейнера
+ * 2. На {@see Application::EVENT_BEFORE_REQUEST} получает ConfigService из DI контейнера
  * 3. Вызывает applyConfiguration()
  * 4. ConfigService использует кэш для производительности
  * 5. ConfigApplier применяет значения БЕЗ рекурсии
+ *
+ * ПОЧЕМУ НЕ ПРЯМО В bootstrap(). Список опций собирается по зарегистрированным модулям
+ * (`ConfigCollector` → `getModules(false)`), а bootstrap-классы выполняются в порядке слияния
+ * конфига: vendor-пакеты раньше корневого `common/config/main.php`. Модули, которые регистрируют
+ * себя из собственного bootstrap (системный Modman — из корневого списка), на момент нашего
+ * bootstrap() ещё не зарегистрированы, их опции в список не попадают и, что хуже, кэшируются
+ * без них — сохранённое значение никогда не применяется. `EVENT_BEFORE_REQUEST` срабатывает в
+ * `Application::run()`, когда все bootstrap'ы (и web, и console) уже отработали. Читателей
+ * params раньше этого момента нет: bootstrap-классы модулей берут params лениво, из замыканий.
  */
 class Bootstrap implements BootstrapInterface
 {
@@ -39,10 +49,20 @@ class Bootstrap implements BootstrapInterface
      */
     public function bootstrap($app): void
     {
-        try {
-            // Регистрируем DI контейнер (модуль еще не инициализирован на этом этапе)
-            $this->registerDependencies();
+        // Регистрируем DI контейнер (модуль еще не инициализирован на этом этапе)
+        $this->registerDependencies();
 
+        $app->on(Application::EVENT_BEFORE_REQUEST, function (): void {
+            $this->applyConfiguration();
+        });
+    }
+
+    /**
+     * Применяет сохранённую конфигурацию к зарегистрированным модулям.
+     */
+    private function applyConfiguration(): void
+    {
+        try {
             /** @var ConfigService $configService */
             $configService = Yii::$container->get(ConfigService::class);
             $configService->applyConfiguration();
