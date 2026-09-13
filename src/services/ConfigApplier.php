@@ -70,9 +70,8 @@ class ConfigApplier
 
         // Вторая часть - ID модуля
         $moduleId = array_shift($parts);
-        $module = Yii::$app->getModule($moduleId);
 
-        if ($module === null) {
+        if (!Yii::$app->hasModule($moduleId)) {
             Yii::warning("Module '{$moduleId}' not found for path: '{$path}'", __METHOD__);
             return;
         }
@@ -87,7 +86,7 @@ class ConfigApplier
 
         if ($section === 'params') {
             // Применяем к params модуля
-            $this->applyToParams($module, $parts, $value);
+            $this->applyToParams($moduleId, $parts, $value);
         } else {
             // Для других секций (components, etc) - можно расширить в будущем
             Yii::warning("Unsupported section '{$section}' in path: '{$path}'", __METHOD__);
@@ -95,23 +94,68 @@ class ConfigApplier
     }
 
     /**
-     * Применяет значение к params модуля
+     * Применяет значение к params модуля — не загружая модуль ради этого.
      *
-     * @param object $module Модуль
+     * Applier работает в bootstrap на каждом запросе, поэтому `getModule($id)` здесь означал бы
+     * «инстанцировать каждый модуль, у которого есть хоть одна сохранённая опция» (на фронте — все
+     * админские модули с настройками). Вместо этого:
+     *  - модуль уже загружен (`getModule($id, false)` вернул экземпляр) — пишем в его `params`;
+     *  - иначе дописываем `params` в *определение* модуля (`getModules(false)[$id]`) и возвращаем его
+     *    через `setModule()`. Yii применит определение при первом настоящем `getModule()` — модуль
+     *    остаётся ленивым, а значения попадут в него вместе с остальным конфигом.
+     *
+     * @param string $moduleId ID модуля (зарегистрирован — проверено вызывающим)
      * @param array $pathParts Оставшиеся части пути
      * @param mixed $value Значение
      */
-    private function applyToParams(object $module, array $pathParts, mixed $value): void
+    private function applyToParams(string $moduleId, array $pathParts, mixed $value): void
     {
-        if (!property_exists($module, 'params') || !is_array($module->params)) {
-            Yii::warning("Module '" . get_class($module) . "' does not have params array", __METHOD__);
+        $module = Yii::$app->getModule($moduleId, false);
+
+        if ($module !== null) {
+            if (!property_exists($module, 'params') || !is_array($module->params)) {
+                Yii::warning("Module '" . get_class($module) . "' does not have params array", __METHOD__);
+                return;
+            }
+
+            $this->setParam($module->params, $pathParts, $value);
             return;
         }
 
+        $definition = Yii::$app->getModules(false)[$moduleId];
+
+        if (is_string($definition)) {
+            $definition = ['class' => $definition];
+        } elseif (!is_array($definition)) {
+            // Объект не-Module или callable-определение: params в него не дописать, не создавая модуль
+            Yii::warning("Module '{$moduleId}' definition is not an array; cannot apply params lazily", __METHOD__);
+            return;
+        }
+
+        $params = $definition['params'] ?? [];
+        if (!is_array($params)) {
+            Yii::warning("Module '{$moduleId}' definition has non-array params", __METHOD__);
+            return;
+        }
+
+        $this->setParam($params, $pathParts, $value);
+        $definition['params'] = $params;
+        Yii::$app->setModule($moduleId, $definition);
+    }
+
+    /**
+     * Записывает значение по пути в массив params (экземпляра или определения модуля).
+     *
+     * @param array $params Массив params (по ссылке)
+     * @param array $pathParts Части пути внутри params
+     * @param mixed $value Значение
+     */
+    private function setParam(array &$params, array $pathParts, mixed $value): void
+    {
         // Если путь простой: ['comments_allowed']
         if (count($pathParts) === 1) {
             $key = $pathParts[0];
-            $module->params[$key] = $value;
+            $params[$key] = $value;
             return;
         }
 
@@ -120,7 +164,7 @@ class ConfigApplier
         $paramKey = implode('.', $pathParts);
 
         try {
-            ArrayHelper::setValue($module->params, $paramKey, $value);
+            ArrayHelper::setValue($params, $paramKey, $value);
         } catch (\Exception $e) {
             Yii::error("Failed to set param '{$paramKey}': {$e->getMessage()}", __METHOD__);
         }
