@@ -8,8 +8,9 @@
 return [
     'backend_app_name' => [
         'path' => 'modules.Config.params.backend.app.name',
-        'label' => 'Backend application name',
-        'description' => 'Yii::$app->getModule(\'config\')->params[\'backend\'][\'app\'][\'name\']',
+        'label' => 'Человекочитаемое имя backend приложения',
+        'description' => 'Не путать с идентификатором backend приложения "app-backend"',
+        'group' => 'backend',
         'category' => 'app',
         'rules' => [
             ['required'],
@@ -21,8 +22,9 @@ return [
     ],
     'frontend_app_name' => [
         'path' => 'modules.Config.params.frontend.app.name',
-        'label' => 'Frontend application name',
-        'description' => 'Yii::$app->getModule(\'config\')->params[\'frontend\'][\'app\'][\'name\']',
+        'label' => 'Человекочитаемое имя frontend приложения',
+        'description' => 'Не путать с идентификатором backend приложения "app-frontend"',
+        'group' => 'frontend',
         'category' => 'app',
         'rules' => [
             ['required'],
@@ -34,8 +36,9 @@ return [
     ],
     'frontend_app_desc' => [
         'path' => 'modules.Config.params.frontend.app.description',
-        'label' => 'Frontend application description',
-        'description' => 'Yii::$app->getModule(\'config\')->params[\'frontend\'][\'app\'][\'description\']',
+        'label' => 'Meta Description',
+        'description' => 'SEO описание frontend приложения',
+        'group' => 'frontend',
         'category' => 'app',
         'rules' => [
             ['required'],
@@ -47,8 +50,9 @@ return [
     ],
     'frontend_app_keywords' => [
         'path' => 'modules.Config.params.frontend.app.keywords',
-        'label' => 'Frontend application keywords',
-        'description' => 'Yii::$app->getModule(\'config\')->params[\'frontend\'][\'app\'][\'keywords\']',
+        'label' => 'Meta Keywords',
+        'description' => 'SEO ключевые слова frontend приложения',
+        'group' => 'frontend',
         'category' => 'app',
         'rules' => [
             ['required'],
@@ -60,8 +64,9 @@ return [
     ],
     'frontend_phone' => [
         'path' => 'modules.Config.params.frontend.phone',
-        'label' => 'Contact phone number',
-        'description' => 'Yii::$app->getModule(\'config\')->params[\'frontend\'][\'phone\']',
+        'label' => 'Контактный номер телефона',
+        'description' => '',
+        'group' => 'frontend',
         'category' => 'app',
         'rules' => [
             ['string']
@@ -72,8 +77,9 @@ return [
     ],
     'frontend_email' => [
         'path' => 'modules.Config.params.frontend.email',
-        'label' => 'Contact e-mail address',
-        'description' => 'Yii::$app->getModule(\'config\')->params[\'frontend\'][\'email\']',
+        'label' => 'Контактный e-mail адрес',
+        'description' => '',
+        'group' => 'frontend',
         'category' => 'app',
         'rules' => [
             ['string'],

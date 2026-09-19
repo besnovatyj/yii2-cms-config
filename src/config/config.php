@@ -9,17 +9,15 @@ return [
     'params' => [
         'iconClass' => 'bi bi-gear',
 
-        'directories' => false, // Если для работы модуля необходимы директории для статики
-
         // Конфигурируемые параметры
         'backend' => [
             'app' => [
-                'name' => 'backend-app',
+                'name' => 'Backend App',
             ],
         ],
         'frontend' => [
             'app' => [
-                'name' => 'frontend-app',
+                'name' => 'Frontend App',
                 'description' => 'Frontend Meta Description',
                 'keywords' => 'Frontend Meta Keywords',
             ],
