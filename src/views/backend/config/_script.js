@@ -133,6 +133,77 @@
         dirtyHint.textContent = dirty > 0 ? 'Несохранённых правок: ' + dirty : '';
     }
 
+    // Копирование обращения к параметру (cfg-meta): клик по строке кладёт её в буфер обмена
+    root.addEventListener('click', function (event) {
+        var button = event.target.closest('.cfg-copy');
+        if (button) {
+            copyText(button.getAttribute('data-copy') || '', button);
+        }
+    });
+
+    /**
+     * Кладёт текст в буфер. Clipboard API доступен только в защищённом контексте (https,
+     * localhost), а разработка идёт по http на локальном домене — поэтому старый execCommand
+     * остаётся не «на всякий случай», а как основной путь для этого окружения.
+     */
+    function copyText(text, button) {
+        if (text === '') {
+            return;
+        }
+
+        if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(text).then(function () {
+                markCopied(button);
+            }, function () {
+                legacyCopy(text, button);
+            });
+            return;
+        }
+
+        legacyCopy(text, button);
+    }
+
+    function legacyCopy(text, button) {
+        var area = document.createElement('textarea');
+        area.value = text;
+        area.setAttribute('readonly', 'readonly');
+        area.style.position = 'fixed';
+        area.style.opacity = '0';
+        document.body.appendChild(area);
+        area.select();
+
+        try {
+            if (document.execCommand('copy')) {
+                markCopied(button);
+            }
+        } catch (e) {
+            // Копирование недоступно — текст остаётся на виду, его всегда можно выделить руками
+        }
+
+        document.body.removeChild(area);
+    }
+
+    /** Подтверждение копирования: галочка вместо иконки буфера на полторы секунды. */
+    function markCopied(button) {
+        var icon = button.querySelector('.bi');
+
+        button.classList.add('cfg-copied');
+        if (icon) {
+            icon.classList.remove('bi-clipboard');
+            icon.classList.add('bi-check2');
+        }
+
+        // Повторный клик продлевает подтверждение, а не возвращает иконку по старому таймеру
+        window.clearTimeout(button.cfgCopyTimer);
+        button.cfgCopyTimer = window.setTimeout(function () {
+            button.classList.remove('cfg-copied');
+            if (icon) {
+                icon.classList.remove('bi-check2');
+                icon.classList.add('bi-clipboard');
+            }
+        }, 1500);
+    }
+
     window.addEventListener('beforeunload', function (event) {
         if (!submitting && root.querySelector('.cfg-field-dirty')) {
             event.preventDefault();

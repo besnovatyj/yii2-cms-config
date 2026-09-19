@@ -92,6 +92,42 @@ class ConfigItem
     }
 
     /**
+     * Готовое обращение к параметру в коде приложения, например
+     * `Yii::$app->getModule('User')->params['rememberMeDuration']`.
+     *
+     * Строка выводится из `path` и нигде не хранится: она целиком определяется тем, куда
+     * {@see \Besnovatyj\Config\services\ConfigApplier} кладёт значение. Записанная руками (раньше
+     * её писали в `description`), она становилась вторым источником правды и расходилась с первым —
+     * в опциях модуля Config, например, стояло `getModule('config')` при пути `modules.Config.…`,
+     * а `getModule()` чувствителен к регистру.
+     *
+     * @return string Пустая строка, если путь пуст или не имеет вида `modules.<Id>.params.<ключ>…`
+     *                (другие секции applier всё равно не применяет)
+     */
+    public function accessor(): string
+    {
+        $parts = explode('.', $this->path);
+
+        if (count($parts) < 4 || array_shift($parts) !== 'modules') {
+            return '';
+        }
+
+        $moduleId = array_shift($parts);
+
+        if (array_shift($parts) !== 'params') {
+            return '';
+        }
+
+        // var_export отдаёт готовый PHP-литерал: строку можно вставлять в код как есть
+        $keys = '';
+        foreach ($parts as $key) {
+            $keys .= '[' . var_export($key, true) . ']';
+        }
+
+        return 'Yii::$app->getModule(' . var_export($moduleId, true) . ')->params' . $keys;
+    }
+
+    /**
      * Извлекает значение по умолчанию из текущей конфигурации приложения
      *
      * @param string $path Путь в конфигурации

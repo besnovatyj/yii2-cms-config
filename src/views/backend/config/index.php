@@ -1,6 +1,5 @@
 <?php
 
-
 /*
  * Copyright (c) 2026 Besnovatyj. Licensed under the MIT License.
  */
@@ -30,7 +29,7 @@ $totalCount = array_sum(array_column($groups, 'total'));
 $totalOverridden = array_sum(array_column($groups, 'overridden'));
 
 /**
- * Количество непрошедших валидацию параметров по разделам.
+ * Количество не прошедших валидацию параметров по разделам.
  * Список параметров длинный, а раздел с ошибкой после отправки может быть вовсе не тем,
  * который открыт: без метки в меню его пришлось бы искать прокруткой всей страницы.
  */
@@ -41,21 +40,6 @@ foreach ($groups as $groupKey => $groupData) {
         $groupErrors[$groupKey] = $count;
     }
 }
-
-
-/**
- * Метка параметра без служебного префикса вида «[Модуль] ».
- * В плоском списке префикс был единственным указанием на владельца опции,
- * внутри карточки модуля он только мешает.
- */
-$shortLabel = static function (string $label): string {
-    $short = trim((string)preg_replace('/^\s*\[[^]]{1,40}]\s*/u', '', $label));
-
-    return $short !== '' ? $short : $label;
-};
-
-/** Описание-«акцессор» (Yii::$app->getModule(...)->params[...]) показываем как техническую подсказку, а не как текст. */
-$isAccessorHint = static fn(string $text): bool => str_contains($text, '::$app') || str_starts_with(trim($text), '$');
 
 /** Значение для поля ввода: массивы/объекты в форму не помещаются. */
 $scalar = static fn(mixed $value): string => is_scalar($value) ? (string)$value : '';
@@ -197,9 +181,9 @@ $groupItems = static function (array $items): array {
                             $inputType = ArrayHelper::getValue($item->inputOptions, 'type', 'input');
                             $hasError = !empty($errors[$id]);
                             $inputId = 'config-' . $id;
-                            $inputName = "ConfigItem[{$id}]";
+                            $inputName = "ConfigItem[$id]";
                             $description = trim($item->description);
-                            $isAccessor = $description !== '' && $isAccessorHint($description);
+                            $accessor = $item->accessor();
                             $wide = in_array($inputType, ['textarea', 'checkbox'], true);
                             // Строка, по которой работает поиск на клиенте
                             $haystack = mb_strtolower($item->label . ' ' . $id . ' ' . $item->path . ' ' . $description);
@@ -211,7 +195,7 @@ $groupItems = static function (array $items): array {
                                     <label class="form-label mb-1 d-flex align-items-baseline gap-2"
                                            for="<?= Html::encode($inputId) ?>"
                                            title="<?= Html::encode($item->label) ?>">
-                                        <span class="fw-semibold"><?= Html::encode($shortLabel($item->label)) ?></span>
+                                        <span class="fw-semibold"><?= Html::encode($item->label) ?></span>
                                         <?php if ($data['overridden']): ?>
                                             <span class="badge rounded-pill bg-warning-subtle text-warning-emphasis cfg-badge">изменено</span>
                                         <?php endif; ?>
@@ -264,15 +248,23 @@ $groupItems = static function (array $items): array {
                                         </div>
                                     <?php endif; ?>
 
-                                    <?php if ($description !== '' && !$isAccessor): ?>
+                                    <?php if ($description !== ''): ?>
                                         <div class="form-text mt-1"><?= $description ?></div>
                                     <?php endif; ?>
 
+                                    <?php // Техническая строка для разработчика: куда значение ложится и как его прочитать ?>
                                     <div class="cfg-meta mt-1">
-                                        <code title="Идентификатор параметра"><?= Html::encode($id) ?></code>
                                         <?php if ($item->path !== ''): ?>
+                                            <code title="Путь в конфигурации; идентификатор параметра: <?= Html::encode($id) ?>"><?= Html::encode($item->path) ?></code>
+                                        <?php endif; ?>
+                                        <?php if ($accessor !== ''): ?>
                                             <span class="cfg-meta-sep">·</span>
-                                            <code title="Путь в конфигурации"><?= Html::encode($item->path) ?></code>
+                                            <button type="button" class="cfg-copy"
+                                                    data-copy="<?= Html::encode($accessor) ?>"
+                                                    title="Скопировать обращение к параметру в коде">
+                                                <code><?= Html::encode($accessor) ?></code>
+                                                <i class="bi bi-clipboard" aria-hidden="true"></i>
+                                            </button>
                                         <?php endif; ?>
                                     </div>
                                 </div>

@@ -91,6 +91,38 @@
     color: var(--bs-border-color);
 }
 
+/*
+ * Обращение к параметру в коде: та же мелкая техническая строка, что и путь, но кликабельная —
+ * копирует себя в буфер. Кнопку раздеваем до текста, чтобы строка метаданных осталась строкой.
+ */
+.config-index .cfg-copy {
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    line-height: inherit;
+    text-align: left;
+    color: var(--bs-secondary-color);
+}
+
+.config-index .cfg-copy code {
+    color: inherit;
+}
+
+.config-index .cfg-copy .bi {
+    margin-left: .2rem;
+    opacity: .65;
+}
+
+.config-index .cfg-copy:hover {
+    color: var(--bs-body-color);
+}
+
+.config-index .cfg-copy.cfg-copied,
+.config-index .cfg-copy.cfg-copied:hover {
+    color: var(--bs-success);
+}
+
 .config-index .cfg-badge {
     font-size: .65rem;
     font-weight: 500;
