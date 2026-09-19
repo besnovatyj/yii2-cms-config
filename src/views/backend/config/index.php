@@ -29,6 +29,19 @@ $this->registerJs(file_get_contents(__DIR__ . '/_script.js'), View::POS_END);
 $totalCount = array_sum(array_column($groups, 'total'));
 $totalOverridden = array_sum(array_column($groups, 'overridden'));
 
+/**
+ * Количество непрошедших валидацию параметров по разделам.
+ * Список параметров длинный, а раздел с ошибкой после отправки может быть вовсе не тем,
+ * который открыт: без метки в меню его пришлось бы искать прокруткой всей страницы.
+ */
+$groupErrors = [];
+foreach ($groups as $groupKey => $groupData) {
+    $count = count(array_intersect_key($errors, $groupData['items']));
+    if ($count > 0) {
+        $groupErrors[$groupKey] = $count;
+    }
+}
+
 
 /**
  * Метка параметра без служебного префикса вида «[Модуль] ».
@@ -118,6 +131,10 @@ $groupItems = static function (array $items): array {
                         data-group="<?= Html::encode($key) ?>">
                     <?= Html::encode($group['label']) ?>
                     <span class="badge rounded-pill text-bg-light ms-1"><?= $group['total'] ?></span>
+                    <?php if (isset($groupErrors[$key])): ?>
+                        <span class="cfg-dot cfg-dot-error"
+                              title="Параметров с ошибками: <?= $groupErrors[$key] ?>"></span>
+                    <?php endif; ?>
                     <?php if ($group['overridden'] > 0): ?>
                         <span class="cfg-dot" title="Изменённых параметров: <?= $group['overridden'] ?>"></span>
                     <?php endif; ?>

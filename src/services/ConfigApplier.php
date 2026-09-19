@@ -19,6 +19,34 @@ use yii\helpers\ArrayHelper;
 class ConfigApplier
 {
     /**
+     * @var array<string, mixed> Значения, стоявшие в конфигурации модулей до применения (path => value)
+     */
+    private array $configured = [];
+
+    /**
+     * Известно ли достоверное значение параметра из конфигурации модуля.
+     *
+     * @param string $path Путь параметра ({@see ConfigItem::$path})
+     * @return bool
+     */
+    public function hasConfiguredValue(string $path): bool
+    {
+        return array_key_exists($path, $this->configured);
+    }
+
+    /**
+     * Значение параметра, каким его задаёт конфигурация модуля (до наложения сохранённого).
+     *
+     * @param string $path Путь параметра ({@see ConfigItem::$path})
+     * @return mixed null — как для «в конфиге ничего не было», так и для неизвестного пути;
+     *               различать помогает {@see hasConfiguredValue()}
+     */
+    public function configuredValue(string $path): mixed
+    {
+        return $this->configured[$path] ?? null;
+    }
+
+    /**
      * Применяет сохраненные значения к приложению
      *
      * @param ConfigItem[] $items Элементы конфигурации
@@ -86,7 +114,7 @@ class ConfigApplier
 
         if ($section === 'params') {
             // Применяем к params модуля
-            $this->applyToParams($moduleId, $parts, $value);
+            $this->applyToParams($moduleId, $parts, $value, $path);
         } else {
             // Для других секций (components, etc) - можно расширить в будущем
             Yii::warning("Unsupported section '{$section}' in path: '{$path}'", __METHOD__);
@@ -107,8 +135,9 @@ class ConfigApplier
      * @param string $moduleId ID модуля (зарегистрирован — проверено вызывающим)
      * @param array $pathParts Оставшиеся части пути
      * @param mixed $value Значение
+     * @param string $path Полный путь параметра (ключ снимка значений по умолчанию)
      */
-    private function applyToParams(string $moduleId, array $pathParts, mixed $value): void
+    private function applyToParams(string $moduleId, array $pathParts, mixed $value, string $path): void
     {
         $module = Yii::$app->getModule($moduleId, false);
 
@@ -118,6 +147,7 @@ class ConfigApplier
                 return;
             }
 
+            $this->rememberConfigured($path, $module->params, $pathParts);
             $this->setParam($module->params, $pathParts, $value);
             return;
         }
@@ -138,9 +168,32 @@ class ConfigApplier
             return;
         }
 
+        $this->rememberConfigured($path, $params, $pathParts);
         $this->setParam($params, $pathParts, $value);
         $definition['params'] = $params;
         Yii::$app->setModule($moduleId, $definition);
+    }
+
+    /**
+     * Запоминает значение, стоявшее в конфигурации модуля, прежде чем поверх ляжет сохранённое.
+     *
+     * Опции не объявляют `default` явно: значение по умолчанию — это то, что задано в конфиге
+     * модуля. После apply() его уже не прочитать (в params лежит сохранённое), поэтому без
+     * снимка невозможно ответить, изменён параметр администратором или просто продублирован
+     * в хранилище. Именно на этот снимок опирается {@see \Besnovatyj\Config\services\ConfigService}.
+     *
+     * @param string $path Полный путь параметра
+     * @param array $params Params модуля (экземпляра или определения) до записи
+     * @param array $pathParts Части пути внутри params
+     */
+    private function rememberConfigured(string $path, array $params, array $pathParts): void
+    {
+        // apply() может быть вызван повторно — эталоном остаётся только первый, «чистый» замер
+        if (array_key_exists($path, $this->configured)) {
+            return;
+        }
+
+        $this->configured[$path] = ArrayHelper::getValue($params, implode('.', $pathParts));
     }
 
     /**

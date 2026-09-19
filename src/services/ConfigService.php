@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace Besnovatyj\Config\services;
 
+use Besnovatyj\Config\entities\ConfigItem;
 use Besnovatyj\Config\repositories\ConfigRepository;
 use Yii;
 
@@ -54,7 +55,9 @@ class ConfigService
      * Получает все элементы конфигурации с текущими значениями.
      * Используется для отображения в UI.
      *
-     * Ключ 'overridden' говорит, задано ли значение вручную (иначе действует дефолт из конфига).
+     * Ключ 'overridden' говорит, что значение действительно отличается от заданного в конфигурации
+     * модуля. Одного лишь присутствия в хранилище мало: форма отправляет все параметры сразу, и
+     * нетронутые тоже оседают в хранилище — по наличию записи «изменёнными» оказывались все.
      *
      * @return array [id => ['item' => ConfigItem, 'value' => mixed, 'overridden' => bool]]
      */
@@ -65,14 +68,89 @@ class ConfigService
 
         $result = [];
         foreach ($items as $id => $item) {
+            $overridden = false;
+
+            if (array_key_exists($id, $values)) {
+                [$defaultKnown, $default] = $this->configuredDefault($item, $values);
+                $overridden = !$defaultKnown || !$this->sameValue($values[$id], $default);
+            }
+
             $result[$id] = [
                 'item' => $item,
                 'value' => $values[$id] ?? $item->defaultValue,
-                'overridden' => array_key_exists($id, $values),
+                'overridden' => $overridden,
             ];
         }
 
         return $result;
+    }
+
+    /**
+     * Значение параметра по умолчанию — то, что задаёт конфигурация модуля.
+     *
+     * Достоверных источников два, и оба нужны:
+     *  - снимок {@see ConfigApplier}: он читает params до того, как перезапишет их сохранённым
+     *    значением, и это единственный способ узнать дефолт уже переопределённого параметра;
+     *  - `ConfigItem::$defaultValue` — годится, только пока параметр отсутствует в хранилище:
+     *    тогда applier его не трогал и в params лежит чистая конфигурация. Для сохранённого
+     *    параметра это значение равно сохранённому и эталоном быть не может.
+     *
+     * Когда дефолт неизвестен (модуль не дал применить значение), лучше считать параметр
+     * изменённым и ничего не трогать, чем удалить настройку из хранилища.
+     *
+     * @param ConfigItem $item Элемент конфигурации
+     * @param array $stored Сохранённые значения [id => value]
+     * @return array{bool, mixed} [известен ли дефолт, его значение]
+     */
+    private function configuredDefault(ConfigItem $item, array $stored): array
+    {
+        if ($this->applier->hasConfiguredValue($item->path)) {
+            return [true, $this->applier->configuredValue($item->path)];
+        }
+
+        if (!array_key_exists($item->id, $stored)) {
+            return [true, $item->defaultValue];
+        }
+
+        return [false, null];
+    }
+
+    /**
+     * Сравнивает значение из формы или хранилища со значением из конфигурации.
+     *
+     * Форма и хранилище оперируют строками, конфигурация — нативными типами (true, 3, null),
+     * поэтому сравниваются нормализованные представления: иначе '3' никогда не совпало бы с 3,
+     * а снятая галочка ('0') — с false.
+     *
+     * @param mixed $value Значение из формы или хранилища
+     * @param mixed $default Значение из конфигурации
+     * @return bool
+     */
+    private function sameValue(mixed $value, mixed $default): bool
+    {
+        $left = $this->normalize($value);
+        $right = $this->normalize($default);
+
+        // Массивы и объекты как строки не сравнить — для них только строгое равенство
+        return $left === null || $right === null
+            ? $value === $default
+            : $left === $right;
+    }
+
+    /**
+     * Приводит скалярное значение к строке для сравнения; null — значение несравнимо.
+     *
+     * @param mixed $value Значение
+     * @return string|null
+     */
+    private function normalize(mixed $value): ?string
+    {
+        return match (true) {
+            $value === null => '',
+            is_bool($value) => $value ? '1' : '0',
+            is_scalar($value) => (string)$value,
+            default => null,
+        };
     }
 
     /**
@@ -160,6 +238,11 @@ class ConfigService
      * Переданные значения дописываются к уже сохранённым: форма может присылать
      * только часть параметров (один раздел), и это не должно стирать остальные.
      *
+     * В хранилище попадает только то, что отличается от конфигурации модуля. Значение, равное
+     * дефолту, из хранилища удаляется: иначе форма (она отправляет все параметры разом) за одно
+     * сохранение объявляла бы изменёнными все параметры, а конфиги модулей после обновления
+     * пакета навсегда перекрывались бы собственной устаревшей копией.
+     *
      * @param array $values Массив [id => value]
      * @return array ['success' => bool, 'errors' => array]
      */
@@ -191,7 +274,23 @@ class ConfigService
         }
 
         // Сохраняем в хранилище, не теряя параметры, которых не было в форме
-        $success = $this->repository->saveValues($known + $this->repository->getValues());
+        $stored = $this->repository->getValues();
+        $result = $stored;
+
+        foreach ($known as $id => $value) {
+            [$defaultKnown, $default] = $this->configuredDefault($items[$id], $stored);
+
+            if ($defaultKnown && $this->sameValue($value, $default)) {
+                unset($result[$id]);
+                continue;
+            }
+
+            $result[$id] = $value;
+        }
+
+        $success = $result === []
+            ? $this->repository->clearValues()
+            : $this->repository->saveValues($result);
 
         if ($success) {
             // Очищаем кэш чтобы изменения применились

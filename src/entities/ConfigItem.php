@@ -194,7 +194,13 @@ class ConfigItem
     }
 
     /**
-     * Валидирует значение согласно правилам
+     * Валидирует значение согласно правилам.
+     *
+     * Правила применяются через `validateAttributes()`, а не прямым `validateAttribute()`:
+     * только так работают `skipOnEmpty`, `skipOnError` и `when`. Для незаполненной опции это
+     * принципиально — у всех валидаторов Yii, кроме `required`, `skipOnEmpty` включён, то есть
+     * пустое значение по умолчанию означает «параметр не задан», а не «задан неверно».
+     * Требование заполнить остаётся за явным правилом `['required']`.
      *
      * @param mixed $value Значение для валидации
      * @return array Массив ошибок валидации (пустой если ошибок нет)
@@ -236,7 +242,7 @@ class ConfigItem
 
         $errors = [];
         foreach ($validators as $validator) {
-            $validator->validateAttribute($model, 'value');
+            $validator->validateAttributes($model, ['value']);
         }
 
         if ($model->hasErrors('value')) {

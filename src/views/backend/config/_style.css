@@ -17,13 +17,20 @@
     font-size: .875rem;
 }
 
-.config-index .cfg-nav .nav-link:hover {
+.config-index .cfg-nav .nav-link:hover:not(.active) {
     background-color: var(--bs-tertiary-bg);
 }
 
+/*
+ * Активное состояние задаём полностью: собственные border-color и background-color выше
+ * перекрывают фон Bootstrap (у `.nav-pills .nav-link.active` та же специфичность, а наш css
+ * подключается позже), и от активного пункта оставался белый текст на светлом фоне без рамки.
+ * Цвета берём из переменных .nav-pills, чтобы меню следовало теме админки.
+ */
 .config-index .cfg-nav .nav-link.active {
-    border-color: transparent;
-    color: var(--bs-white);
+    border-color: var(--bs-nav-pills-link-active-bg, var(--bs-primary));
+    background-color: var(--bs-nav-pills-link-active-bg, var(--bs-primary));
+    color: var(--bs-nav-pills-link-active-color, var(--bs-white));
 }
 
 .config-index .cfg-dot {
@@ -34,6 +41,16 @@
     border-radius: 50%;
     background-color: var(--bs-warning);
     vertical-align: middle;
+}
+
+/* Раздел, в котором есть непрошедшие валидацию параметры */
+.config-index .cfg-dot-error {
+    background-color: var(--bs-danger);
+}
+
+/* На фоне активного пункта точки теряют контраст — отделяем их тонкой обводкой */
+.config-index .cfg-nav .nav-link.active .cfg-dot {
+    box-shadow: 0 0 0 1px var(--bs-nav-pills-link-active-color, var(--bs-white));
 }
 
 .config-index .cfg-field-inner {

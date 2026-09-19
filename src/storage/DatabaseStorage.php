@@ -83,6 +83,11 @@ class DatabaseStorage implements StorageInterface
                 }
             }
 
+            // Набор заменяет хранилище целиком: параметр, которого в нём нет, вернулся к дефолту
+            $values === []
+                ? ConfigValue::deleteAll()
+                : ConfigValue::deleteAll(['not in', 'id', array_keys($values)]);
+
             $transaction->commit();
             return true;
         } catch (\Exception $e) {
